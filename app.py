@@ -135,14 +135,14 @@ def render_result(name, image_rgb, result):
 
     left, right = st.columns(2)
     with left:
-        st.image(image_rgb, caption="原始照片", use_container_width=True)
+        st.image(image_rgb, caption="原始照片", use_column_width=True)
     with right:
-        st.image(result["annotated_rgb"], caption="YOLO 葉片定位 + 黃化遮罩", use_container_width=True)
-    st.image(result["yellow_mask_rgb"], caption="系統判定的黃色 / 黃化區域 mask", use_container_width=True)
+        st.image(result["annotated_rgb"], caption="YOLO 葉片定位 + 黃化遮罩", use_column_width=True)
+    st.image(result["yellow_mask_rgb"], caption="系統判定的黃色 / 黃化區域 mask", use_column_width=True)
 
     with st.expander("查看每個葉片框的詳細數值"):
         if result["detections"]:
-            st.dataframe(result["detections"], use_container_width=True)
+            st.dataframe(result["detections"], use_column_width=True)
         else:
             st.warning("沒有偵測到 leaf。可嘗試降低 confidence、換更清楚的大豆葉片照片，或確認權重是否正確。")
 
@@ -201,7 +201,7 @@ with tab_single:
                 st.stop()
             preview = image_rgb.copy()
             cv2.rectangle(preview, (x1, y1), (x2, y2), (255, 0, 0), 4)
-            st.image(preview, caption="手動 ROI 預覽：藍框內才會進行黃化分析", use_container_width=True)
+            st.image(preview, caption="手動 ROI 預覽：藍框內才會進行黃化分析", use_column_width=True)
             analysis_rgb = image_rgb[y1:y2, x1:x2]
 
         with st.spinner("正在分析照片..."):
@@ -217,7 +217,7 @@ with tab_single:
                 with col:
                     st.metric(pname.split("（")[0], f"{r['total_yellow_ratio']*100:.2f}%")
                     st.caption(r["diagnosis"])
-                    st.image(r["yellow_mask_rgb"], use_container_width=True)
+                    st.image(r["yellow_mask_rgb"], use_column_width=True)
     else:
         st.info("請上傳一張大豆葉片照片開始診斷。")
 
@@ -238,7 +238,7 @@ with tab_batch:
                 "有效葉片像素": result["total_leaf_pixels"],
             })
         df = pd.DataFrame(rows)
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, use_column_width=True)
         st.download_button("下載批次分析 CSV", df.to_csv(index=False).encode("utf-8-sig"), file_name="soybean_yellowing_results.csv", mime="text/csv")
         st.bar_chart(df.set_index("圖片")[["黃化比例(%)"]])
     else:
