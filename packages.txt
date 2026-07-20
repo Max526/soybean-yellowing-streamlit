@@ -1,2 +1,13 @@
-libgl1
-libglib2.0-0t64
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.env
+.venv/
+venv/
+.env.local
+.DS_Store
+.streamlit/secrets.toml
+outputs/
+*.log
