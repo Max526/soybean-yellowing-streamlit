@@ -17,10 +17,6 @@ try:
 except Exception:  # pragma: no cover
     YOLO = None
 
-
-# =========================
-# 基本設定
-# =========================
 APP_TITLE = "大豆葉片黃化程度分析平台"
 DEFAULT_WEIGHT_PATH = "weights/best.pt"
 
@@ -32,9 +28,6 @@ st.set_page_config(
 )
 
 
-# =========================
-# 資料結構
-# =========================
 @dataclass
 class HSVConfig:
     yellow_lower: tuple[int, int, int]
@@ -59,67 +52,31 @@ class AnalysisResult:
     bbox: tuple[int, int, int, int]
 
 
-# =========================
-# 樣式
-# =========================
 def inject_css() -> None:
     st.markdown(
         """
         <style>
-        .main-title {
-            font-size: 2.2rem;
-            font-weight: 800;
-            margin-bottom: 0.2rem;
-        }
-        .sub-title {
-            color: #64748b;
-            font-size: 1.05rem;
-            margin-bottom: 1.2rem;
-        }
-        .metric-card {
-            border: 1px solid #e2e8f0;
-            border-radius: 18px;
-            padding: 18px 20px;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-        }
-        .metric-label {
-            color: #64748b;
-            font-size: 0.92rem;
-            margin-bottom: 4px;
-        }
-        .metric-value {
-            color: #0f172a;
-            font-size: 1.7rem;
-            font-weight: 800;
-        }
-        .diagnosis-box {
-            border-radius: 18px;
-            padding: 18px 20px;
-            margin-top: 8px;
-            border: 1px solid rgba(15, 23, 42, 0.08);
-        }
+        .main-title { font-size: 2.2rem; font-weight: 800; margin-bottom: 0.2rem; }
+        .sub-title { color: #64748b; font-size: 1.05rem; margin-bottom: 1.2rem; }
+        .metric-card { border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px 20px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); }
+        .metric-label { color: #64748b; font-size: 0.92rem; margin-bottom: 4px; }
+        .metric-value { color: #0f172a; font-size: 1.7rem; font-weight: 800; }
+        .diagnosis-box { border-radius: 18px; padding: 18px 20px; margin-top: 8px; border: 1px solid rgba(15, 23, 42, 0.08); }
         .healthy { background: #ecfdf5; color: #065f46; }
         .mild { background: #fefce8; color: #854d0e; }
         .moderate { background: #fff7ed; color: #9a3412; }
         .severe { background: #fef2f2; color: #991b1b; }
-        .small-note {
-            color: #64748b;
-            font-size: 0.9rem;
-        }
+        .small-note { color: #64748b; font-size: 0.9rem; }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
 
-# =========================
-# 模型與影像工具
-# =========================
 @st.cache_resource(show_spinner=False)
 def load_yolo_model(weight_path: str) -> Any | None:
     if YOLO is None:
-        st.error("尚未安裝 ultralytics。請先執行：pip install ultralytics")
+        st.error("尚未安裝 ultralytics。請確認 requirements.txt 已包含 ultralytics。")
         return None
 
     path = Path(weight_path)
@@ -177,9 +134,6 @@ def get_leaf_detections(model: Any, image_bgr: np.ndarray, conf: float, iou: flo
     return detections
 
 
-# =========================
-# 黃化分析
-# =========================
 def build_hsv_config() -> HSVConfig:
     st.sidebar.markdown("### 黃化判斷參數 HSV")
     st.sidebar.caption("HSV 參數會影響哪些像素被視為黃色或綠色。若照片偏黃、偏暗或光線不均，可小幅調整。")
@@ -215,10 +169,8 @@ def build_hsv_config() -> HSVConfig:
 
 def analyze_leaf_color(leaf_bgr: np.ndarray, config: HSVConfig) -> tuple[float, float, float, int, np.ndarray]:
     hsv = cv2.cvtColor(leaf_bgr, cv2.COLOR_BGR2HSV)
-
     yellow_mask = cv2.inRange(hsv, np.array(config.yellow_lower), np.array(config.yellow_upper))
     green_mask = cv2.inRange(hsv, np.array(config.green_lower), np.array(config.green_upper))
-
     valid_mask = ((hsv[:, :, 1] >= config.min_leaf_saturation) & (hsv[:, :, 2] >= config.min_leaf_value)).astype(np.uint8) * 255
 
     yellow_mask = cv2.bitwise_and(yellow_mask, valid_mask)
@@ -234,7 +186,6 @@ def analyze_leaf_color(leaf_bgr: np.ndarray, config: HSVConfig) -> tuple[float, 
     yellow_ratio = yellow_area / valid_area * 100
     green_ratio = green_area / valid_area * 100
     yellow_green_ratio = yellow_area / max(green_area, 1)
-
     return yellow_ratio, green_ratio, yellow_green_ratio, valid_area, yellow_mask
 
 
@@ -252,8 +203,7 @@ def make_mask_overlay(leaf_bgr: np.ndarray, mask: np.ndarray) -> np.ndarray:
     overlay = leaf_bgr.copy()
     yellow_layer = np.zeros_like(leaf_bgr)
     yellow_layer[:, :] = (0, 255, 255)
-    overlay = np.where(mask[:, :, None] > 0, cv2.addWeighted(leaf_bgr, 0.45, yellow_layer, 0.55, 0), overlay)
-    return overlay
+    return np.where(mask[:, :, None] > 0, cv2.addWeighted(leaf_bgr, 0.45, yellow_layer, 0.55, 0), overlay)
 
 
 def draw_detection_summary(image_bgr: np.ndarray, results: list[AnalysisResult]) -> np.ndarray:
@@ -268,9 +218,6 @@ def draw_detection_summary(image_bgr: np.ndarray, results: list[AnalysisResult])
     return canvas
 
 
-# =========================
-# 分析流程
-# =========================
 def analyze_image(
     filename: str,
     image_bgr: np.ndarray,
@@ -319,9 +266,8 @@ def analyze_image(
 
 
 def results_to_dataframe(results: list[AnalysisResult]) -> pd.DataFrame:
-    rows = []
-    for item in results:
-        rows.append(
+    return pd.DataFrame(
+        [
             {
                 "filename": item.filename,
                 "leaf_id": item.leaf_id,
@@ -334,17 +280,15 @@ def results_to_dataframe(results: list[AnalysisResult]) -> pd.DataFrame:
                 "suggestion": item.suggestion,
                 "bbox": item.bbox,
             }
-        )
-    return pd.DataFrame(rows)
+            for item in results
+        ]
+    )
 
 
 def dataframe_to_csv_bytes(df: pd.DataFrame) -> bytes:
     return df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
 
 
-# =========================
-# UI
-# =========================
 def render_header() -> None:
     st.markdown(f'<div class="main-title">🌱 {APP_TITLE}</div>', unsafe_allow_html=True)
     st.markdown(
@@ -383,38 +327,20 @@ def render_sidebar() -> tuple[str, float, float, int, bool, HSVConfig]:
 
     st.sidebar.markdown("---")
     st.sidebar.info("若模型權重不存在，平台會暫時以整張圖片進行 HSV 分析，僅供測試介面，不能視為正式葉片偵測結果。")
-
     return weight_path, conf, iou, max_det, only_largest_leaf, config
 
 
-def render_single_image_result(
-    uploaded_file: Any,
-    model: Any | None,
-    config: HSVConfig,
-    conf: float,
-    iou: float,
-    max_det: int,
-    only_largest_leaf: bool,
-) -> list[AnalysisResult]:
+def render_single_image_result(uploaded_file: Any, model: Any | None, config: HSVConfig, conf: float, iou: float, max_det: int, only_largest_leaf: bool) -> list[AnalysisResult]:
     image = Image.open(uploaded_file)
     image_bgr = pil_to_bgr(image)
 
     start = time.time()
-    results, annotated, overlays = analyze_image(
-        filename=uploaded_file.name,
-        image_bgr=image_bgr,
-        model=model,
-        config=config,
-        conf=conf,
-        iou=iou,
-        max_det=max_det,
-        only_largest_leaf=only_largest_leaf,
-    )
+    results, annotated, overlays = analyze_image(uploaded_file.name, image_bgr, model, config, conf, iou, max_det, only_largest_leaf)
     elapsed = time.time() - start
 
     if not results:
         st.warning("沒有偵測到葉片。可以降低 confidence，或確認圖片中葉片是否清楚。")
-        st.image(image, caption="原始圖片", use_container_width=True)
+        st.image(image, caption="原始圖片", use_column_width=True)
         return []
 
     df = results_to_dataframe(results)
@@ -445,31 +371,24 @@ def render_single_image_result(
     st.markdown("### 影像分析結果")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.image(image, caption="原始圖片", use_container_width=True)
+        st.image(image, caption="原始圖片", use_column_width=True)
     with col2:
-        st.image(bgr_to_rgb(annotated), caption="YOLO 偵測與黃化比例", use_container_width=True)
+        st.image(bgr_to_rgb(annotated), caption="YOLO 偵測與黃化比例", use_column_width=True)
     with col3:
         if overlays:
-            st.image(bgr_to_rgb(overlays[0]), caption="第 1 片葉片黃化遮罩", use_container_width=True)
+            st.image(bgr_to_rgb(overlays[0]), caption="第 1 片葉片黃化遮罩", use_column_width=True)
         else:
             st.info("沒有可顯示的遮罩。")
 
     with st.expander("查看每片葉片詳細數據", expanded=True):
         st.dataframe(df, use_container_width=True)
-        st.download_button(
-            "下載本張圖片分析 CSV",
-            data=dataframe_to_csv_bytes(df),
-            file_name=f"{Path(uploaded_file.name).stem}_analysis.csv",
-            mime="text/csv",
-        )
-
+        st.download_button("下載本張圖片分析 CSV", data=dataframe_to_csv_bytes(df), file_name=f"{Path(uploaded_file.name).stem}_analysis.csv", mime="text/csv")
     return results
 
 
 def main() -> None:
     inject_css()
     render_header()
-
     weight_path, conf, iou, max_det, only_largest_leaf, config = render_sidebar()
     model = load_yolo_model(weight_path)
 
@@ -499,31 +418,19 @@ def main() -> None:
         return
 
     all_results: list[AnalysisResult] = []
-
     if len(uploaded_files) == 1:
         all_results.extend(render_single_image_result(uploaded_files[0], model, config, conf, iou, max_det, only_largest_leaf))
     else:
         st.markdown("### 批次分析結果")
         progress = st.progress(0)
         status = st.empty()
-
         for idx, uploaded_file in enumerate(uploaded_files, start=1):
             status.write(f"正在分析：{uploaded_file.name} ({idx}/{len(uploaded_files)})")
             image = Image.open(uploaded_file)
             image_bgr = pil_to_bgr(image)
-            results, _, _ = analyze_image(
-                filename=uploaded_file.name,
-                image_bgr=image_bgr,
-                model=model,
-                config=config,
-                conf=conf,
-                iou=iou,
-                max_det=max_det,
-                only_largest_leaf=only_largest_leaf,
-            )
+            results, _, _ = analyze_image(uploaded_file.name, image_bgr, model, config, conf, iou, max_det, only_largest_leaf)
             all_results.extend(results)
             progress.progress(idx / len(uploaded_files))
-
         status.success("批次分析完成")
 
         if all_results:
@@ -547,17 +454,9 @@ def main() -> None:
 
             st.markdown("#### 每張圖片摘要")
             st.dataframe(summary, use_container_width=True)
-
             st.markdown("#### 每片葉片詳細資料")
             st.dataframe(df, use_container_width=True)
-
-            csv_buffer = io.BytesIO(dataframe_to_csv_bytes(df))
-            st.download_button(
-                "下載完整批次分析 CSV",
-                data=csv_buffer,
-                file_name="batch_leaf_yellowing_analysis.csv",
-                mime="text/csv",
-            )
+            st.download_button("下載完整批次分析 CSV", data=io.BytesIO(dataframe_to_csv_bytes(df)), file_name="batch_leaf_yellowing_analysis.csv", mime="text/csv")
         else:
             st.warning("批次圖片中沒有偵測到葉片。")
 
