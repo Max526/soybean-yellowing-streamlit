@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import io
 import time
@@ -21,7 +21,7 @@ except Exception:  # pragma: no cover
 # =========================
 # 基本設定
 # =========================
-APP_TITLE = "大豆葉片黃化智慧診斷平台"
+APP_TITLE = "大豆葉片黃化程度分析平台"
 DEFAULT_WEIGHT_PATH = "weights/best.pt"
 
 st.set_page_config(
@@ -171,14 +171,7 @@ def get_leaf_detections(model: Any, image_bgr: np.ndarray, conf: float, iou: flo
         confidence = float(box.conf[0].detach().cpu().item()) if box.conf is not None else 0.0
         cls_id = int(box.cls[0].detach().cpu().item()) if box.cls is not None else -1
         area = (x2 - x1) * (y2 - y1)
-        detections.append(
-            {
-                "bbox": (x1, y1, x2, y2),
-                "confidence": confidence,
-                "class_id": cls_id,
-                "area": area,
-            }
-        )
+        detections.append({"bbox": (x1, y1, x2, y2), "confidence": confidence, "class_id": cls_id, "area": area})
 
     detections.sort(key=lambda item: item["area"], reverse=True)
     return detections
@@ -188,23 +181,27 @@ def get_leaf_detections(model: Any, image_bgr: np.ndarray, conf: float, iou: flo
 # 黃化分析
 # =========================
 def build_hsv_config() -> HSVConfig:
-    st.sidebar.markdown("### HSV 黃化參數")
+    st.sidebar.markdown("### 黃化判斷參數 HSV")
+    st.sidebar.caption("HSV 參數會影響哪些像素被視為黃色或綠色。若照片偏黃、偏暗或光線不均，可小幅調整。")
 
-    with st.sidebar.expander("黃色範圍", expanded=False):
-        y_h_min = st.slider("Yellow Hue min", 0, 179, 15)
-        y_h_max = st.slider("Yellow Hue max", 0, 179, 40)
-        y_s_min = st.slider("Yellow Saturation min", 0, 255, 35)
-        y_v_min = st.slider("Yellow Value min", 0, 255, 70)
+    with st.sidebar.expander("黃色像素判斷範圍", expanded=False):
+        st.caption("調整哪些顏色會被計入黃化區域。範圍放寬會提高黃化比例，範圍縮小會讓判斷較嚴格。")
+        y_h_min = st.slider("黃色色相下限", 0, 179, 15, help="Hue 下限。降低後，較偏橘或暗黃的像素也可能被計入。")
+        y_h_max = st.slider("黃色色相上限", 0, 179, 40, help="Hue 上限。提高後，較偏黃綠的像素也可能被計入。")
+        y_s_min = st.slider("黃色最低飽和度", 0, 255, 35, help="排除灰白或低彩度區域。數值越高，黃色判斷越嚴格。")
+        y_v_min = st.slider("黃色最低亮度", 0, 255, 70, help="排除過暗像素。數值越高，暗部越不容易被算作黃化。")
 
-    with st.sidebar.expander("綠色範圍", expanded=False):
-        g_h_min = st.slider("Green Hue min", 0, 179, 35)
-        g_h_max = st.slider("Green Hue max", 0, 179, 90)
-        g_s_min = st.slider("Green Saturation min", 0, 255, 30)
-        g_v_min = st.slider("Green Value min", 0, 255, 45)
+    with st.sidebar.expander("綠色像素判斷範圍", expanded=False):
+        st.caption("用來估計健康綠色區域。綠色比例可作為黃化比例的輔助對照。")
+        g_h_min = st.slider("綠色色相下限", 0, 179, 35)
+        g_h_max = st.slider("綠色色相上限", 0, 179, 90)
+        g_s_min = st.slider("綠色最低飽和度", 0, 255, 30)
+        g_v_min = st.slider("綠色最低亮度", 0, 255, 45)
 
     with st.sidebar.expander("有效葉片像素過濾", expanded=False):
-        min_sat = st.slider("最低飽和度", 0, 255, 25)
-        min_val = st.slider("最低亮度", 0, 255, 35)
+        st.caption("用來排除太暗、太灰或背景區域。調太高可能漏掉陰影中的葉片。")
+        min_sat = st.slider("有效像素最低飽和度", 0, 255, 25)
+        min_val = st.slider("有效像素最低亮度", 0, 255, 35)
 
     return HSVConfig(
         yellow_lower=(y_h_min, y_s_min, y_v_min),
@@ -222,7 +219,6 @@ def analyze_leaf_color(leaf_bgr: np.ndarray, config: HSVConfig) -> tuple[float, 
     yellow_mask = cv2.inRange(hsv, np.array(config.yellow_lower), np.array(config.yellow_upper))
     green_mask = cv2.inRange(hsv, np.array(config.green_lower), np.array(config.green_upper))
 
-    # 有效葉片區域：排除過暗、灰白、低飽和背景
     valid_mask = ((hsv[:, :, 1] >= config.min_leaf_saturation) & (hsv[:, :, 2] >= config.min_leaf_value)).astype(np.uint8) * 255
 
     yellow_mask = cv2.bitwise_and(yellow_mask, valid_mask)
@@ -286,7 +282,6 @@ def analyze_image(
     only_largest_leaf: bool,
 ) -> tuple[list[AnalysisResult], np.ndarray, list[np.ndarray]]:
     if model is None:
-        # 沒有 YOLO 時，退回整張圖分析，方便先測平台；此結果不能視為葉片偵測結果。
         h, w = image_bgr.shape[:2]
         detections = [{"bbox": (0, 0, w, h), "confidence": 1.0, "class_id": 0, "area": w * h}]
     else:
@@ -353,7 +348,7 @@ def dataframe_to_csv_bytes(df: pd.DataFrame) -> bytes:
 def render_header() -> None:
     st.markdown(f'<div class="main-title">🌱 {APP_TITLE}</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="sub-title">YOLO 葉片偵測 × HSV 黃化比例分析 × 批次 CSV 匯出</div>',
+        '<div class="sub-title">面向農業研究、教學展示與田間初步篩檢的黃化程度量化工具</div>',
         unsafe_allow_html=True,
     )
 
@@ -371,21 +366,23 @@ def render_metric(label: str, value: str) -> None:
 
 
 def render_sidebar() -> tuple[str, float, float, int, bool, HSVConfig]:
-    st.sidebar.title("⚙️ 分析設定")
+    st.sidebar.title("⚙️ 分析參數設定")
+    st.sidebar.caption("這些設定會影響葉片偵測與黃化比例計算；若不確定，建議使用預設值。")
 
     weight_path = st.sidebar.text_input("YOLO 權重路徑", DEFAULT_WEIGHT_PATH)
     st.sidebar.caption("建議將訓練好的模型放在 weights/best.pt")
 
-    st.sidebar.markdown("### YOLO 偵測參數")
-    conf = st.sidebar.slider("信心閾值 Confidence", 0.05, 0.95, 0.25, 0.05)
-    iou = st.sidebar.slider("NMS IoU 閾值", 0.10, 0.90, 0.45, 0.05)
-    max_det = st.sidebar.slider("最多偵測葉片數", 1, 50, 10, 1)
-    only_largest_leaf = st.sidebar.checkbox("只分析最大葉片", value=False)
+    st.sidebar.markdown("### YOLO 葉片偵測設定")
+    st.sidebar.caption("控制模型要多嚴格地判斷葉片位置。信心值越高，誤偵測較少，但可能漏掉較不清楚的葉片。")
+    conf = st.sidebar.slider("葉片偵測信心值", 0.05, 0.95, 0.25, 0.05, help="數值越高，模型越保守；數值越低，較容易偵測到葉片，但也可能增加誤偵測。")
+    iou = st.sidebar.slider("重疊框合併門檻 IoU", 0.10, 0.90, 0.45, 0.05, help="用來合併重疊的偵測框。一般使用預設值即可。")
+    max_det = st.sidebar.slider("最多偵測葉片數", 1, 50, 10, 1, help="限制單張圖片最多分析幾片葉片，避免背景誤判造成過多結果。")
+    only_largest_leaf = st.sidebar.checkbox("只分析最大葉片", value=False, help="適合單片葉片照片；若圖片有多片葉片，建議取消勾選。")
 
     config = build_hsv_config()
 
     st.sidebar.markdown("---")
-    st.sidebar.info("若模型權重不存在，平台會暫時以整張圖片進行 HSV 分析，方便先測試介面。")
+    st.sidebar.info("若模型權重不存在，平台會暫時以整張圖片進行 HSV 分析，僅供測試介面，不能視為正式葉片偵測結果。")
 
     return weight_path, conf, iou, max_det, only_largest_leaf, config
 
@@ -417,7 +414,7 @@ def render_single_image_result(
 
     if not results:
         st.warning("沒有偵測到葉片。可以降低 confidence，或確認圖片中葉片是否清楚。")
-        st.image(image, caption="原始圖片", use_column_width=True)
+        st.image(image, caption="原始圖片", use_container_width=True)
         return []
 
     df = results_to_dataframe(results)
@@ -438,7 +435,7 @@ def render_single_image_result(
     st.markdown(
         f"""
         <div class="diagnosis-box {diag_class}">
-            <h3 style="margin: 0 0 6px 0;">診斷結果：{main_diagnosis}</h3>
+            <h3 style="margin: 0 0 6px 0;">黃化分級：{main_diagnosis}</h3>
             <div>{suggestion}</div>
         </div>
         """,
@@ -448,12 +445,12 @@ def render_single_image_result(
     st.markdown("### 影像分析結果")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.image(image, caption="原始圖片", use_column_width=True)
+        st.image(image, caption="原始圖片", use_container_width=True)
     with col2:
-        st.image(bgr_to_rgb(annotated), caption="YOLO 偵測與黃化比例", use_column_width=True)
+        st.image(bgr_to_rgb(annotated), caption="YOLO 偵測與黃化比例", use_container_width=True)
     with col3:
         if overlays:
-            st.image(bgr_to_rgb(overlays[0]), caption="第 1 片葉片黃化遮罩", use_column_width=True)
+            st.image(bgr_to_rgb(overlays[0]), caption="第 1 片葉片黃化遮罩", use_container_width=True)
         else:
             st.info("沒有可顯示的遮罩。")
 
@@ -477,9 +474,10 @@ def main() -> None:
     model = load_yolo_model(weight_path)
 
     st.markdown("### 上傳葉片圖片")
+    st.caption("適用於農業研究、教學展示、作物影像分析與田間初步篩檢；本平台提供黃化比例量化，不直接判定病因。")
     uploaded_files = st.file_uploader(
-        "支援 JPG / JPEG / PNG，可一次上傳多張進行批次分析。",
-        type=["jpg", "jpeg", "png"],
+        "支援 JPG / JPEG / PNG / BMP，可一次上傳多張進行批次分析。",
+        type=["jpg", "jpeg", "png", "bmp"],
         accept_multiple_files=True,
     )
 
@@ -487,11 +485,15 @@ def main() -> None:
         st.info("請上傳一張或多張葉片圖片開始分析。")
         st.markdown(
             """
+            #### 平台定位
+            本平台是大豆葉片黃化程度量化工具，適合研究、教學與田間初步篩檢。  
+            輸出結果可輔助觀察黃化程度，但實際病因仍需搭配田間紀錄與專業判斷。
+
             #### 平台流程
             1. 使用 YOLO 找出葉片位置  
             2. 在葉片區域內轉換 HSV 色彩空間  
             3. 計算黃色比例、綠色比例與黃綠比  
-            4. 依黃化比例輸出健康、輕度、中度或嚴重黃化診斷  
+            4. 依黃化比例輸出健康、輕度、中度或嚴重黃化分級  
             """
         )
         return
@@ -499,11 +501,7 @@ def main() -> None:
     all_results: list[AnalysisResult] = []
 
     if len(uploaded_files) == 1:
-        all_results.extend(
-            render_single_image_result(
-                uploaded_files[0], model, config, conf, iou, max_det, only_largest_leaf
-            )
-        )
+        all_results.extend(render_single_image_result(uploaded_files[0], model, config, conf, iou, max_det, only_largest_leaf))
     else:
         st.markdown("### 批次分析結果")
         progress = st.progress(0)
@@ -565,13 +563,10 @@ def main() -> None:
 
     st.markdown("---")
     st.markdown(
-        '<div class="small-note">提醒：本系統提供影像輔助診斷，實際田間判斷仍建議搭配水分、土壤、病蟲害與生育期資料。</div>',
+        '<div class="small-note">提醒：本系統提供黃化比例量化與影像輔助判斷，不等同完整病害診斷；實際田間判斷仍建議搭配水分、土壤、病蟲害與生育期資料。</div>',
         unsafe_allow_html=True,
     )
 
 
 if __name__ == "__main__":
     main()
-
-
-
