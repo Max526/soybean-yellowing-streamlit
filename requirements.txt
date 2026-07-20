@@ -4,8 +4,9 @@
 
 本平台定位為「黃化程度量化工具」，適合農業研究、教學展示、作物影像分析與田間初步篩檢；輸出結果可輔助觀察黃化程度，但不等同完整病害診斷。
 
-## 本版優化重點
+## 本版修正重點
 
+- 修正 Streamlit Cloud apt 階段的 `packages.txt` 錯誤：本專案使用 `opencv-python-headless`，不需要額外安裝 `libgl1` / `libglib2.0-0t64`，因此將 `packages.txt` 清空，避免 Cloud 解析到錯誤內容後出現 `xargs: unmatched double quote` 或 `Command line option '>' is not understood`。
 - 修正 Streamlit 新舊版本 `st.image` 參數相容性，避免 `use_container_width` / `use_column_width` 部署錯誤。
 - 圖片讀取加入 EXIF 方向修正，手機拍攝照片不易旋轉錯誤。
 - 大圖自動縮小到指定最大邊長，降低 Streamlit Cloud 記憶體壓力並加快推論。
@@ -30,10 +31,13 @@ app.py
 ```text
 app.py
 requirements.txt
+runtime.txt
 packages.txt
 .streamlit/config.toml
 README.md
 ```
+
+`packages.txt` 目前刻意保持空白，因為 `requirements.txt` 使用的是 `opencv-python-headless`，部署時不需要額外 apt 套件。請不要把錯誤訊息、shell 指令或 Markdown 文字貼進 `packages.txt`。
 
 若使用 YOLO 權重，建議另外放入：
 
