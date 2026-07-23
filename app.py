@@ -261,18 +261,55 @@ def clean_mask(mask: np.ndarray, kernel_size: int) -> np.ndarray:
     return cv2.morphologyEx(opened, cv2.MORPH_CLOSE, kernel)
 
 
+def remove_small_components(mask: np.ndarray, min_area_ratio: float = 0.003) -> np.ndarray:
+    """Keep only meaningful connected components to reduce background speckles."""
+    num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    if num_labels <= 1:
+        return mask
+    min_area = max(32, int(mask.shape[0] * mask.shape[1] * min_area_ratio))
+    cleaned = np.zeros_like(mask)
+    for label_id in range(1, num_labels):
+        area = int(stats[label_id, cv2.CC_STAT_AREA])
+        if area >= min_area:
+            cleaned[labels == label_id] = 255
+    return cleaned
+
+
+def build_leaf_candidate_mask(leaf_bgr: np.ndarray, hsv: np.ndarray, config: HSVConfig) -> np.ndarray:
+    """Estimate the real leaf surface inside the YOLO bbox before yellow-ratio calculation."""
+    rgb = cv2.cvtColor(leaf_bgr, cv2.COLOR_BGR2RGB).astype(np.float32)
+    r, g, b = rgb[:, :, 0], rgb[:, :, 1], rgb[:, :, 2]
+    exg = 2 * g - r - b
+
+    saturation_mask = hsv[:, :, 1] >= config.min_leaf_saturation
+    value_mask = (hsv[:, :, 2] >= config.min_leaf_value) & (hsv[:, :, 2] <= 245)
+    hue_green_yellow_mask = (hsv[:, :, 0] >= 15) & (hsv[:, :, 0] <= 95)
+    vegetation_mask = exg > -25
+
+    leaf_mask = (saturation_mask & value_mask & hue_green_yellow_mask & vegetation_mask).astype(np.uint8) * 255
+    leaf_mask = clean_mask(leaf_mask, max(3, config.morph_kernel_size))
+    leaf_mask = remove_small_components(leaf_mask, min_area_ratio=0.004)
+
+    kernel = np.ones((5, 5), dtype=np.uint8)
+    leaf_mask = cv2.morphologyEx(leaf_mask, cv2.MORPH_CLOSE, kernel)
+    return leaf_mask
+
+
 def analyze_leaf_color(leaf_bgr: np.ndarray, config: HSVConfig) -> tuple[float, float, float, int, np.ndarray]:
     hsv = cv2.cvtColor(leaf_bgr, cv2.COLOR_BGR2HSV)
+    leaf_mask = build_leaf_candidate_mask(leaf_bgr, hsv, config)
+
     yellow_mask = cv2.inRange(hsv, np.array(config.yellow_lower), np.array(config.yellow_upper))
     green_mask = cv2.inRange(hsv, np.array(config.green_lower), np.array(config.green_upper))
-    valid_mask = ((hsv[:, :, 1] >= config.min_leaf_saturation) & (hsv[:, :, 2] >= config.min_leaf_value)).astype(np.uint8) * 255
 
-    yellow_mask = clean_mask(cv2.bitwise_and(yellow_mask, valid_mask), config.morph_kernel_size)
-    green_mask = clean_mask(cv2.bitwise_and(green_mask, valid_mask), config.morph_kernel_size)
+    yellow_mask = clean_mask(cv2.bitwise_and(yellow_mask, leaf_mask), config.morph_kernel_size)
+    green_mask = clean_mask(cv2.bitwise_and(green_mask, leaf_mask), config.morph_kernel_size)
 
-    leaf_color_mask = cv2.bitwise_or(yellow_mask, green_mask)
-    leaf_area = int(np.count_nonzero(leaf_color_mask))
-    yellow_area = int(np.count_nonzero(cv2.bitwise_and(yellow_mask, leaf_color_mask)))
+    yellow_mask = remove_small_components(yellow_mask, min_area_ratio=0.0015)
+    green_mask = remove_small_components(green_mask, min_area_ratio=0.0015)
+
+    leaf_area = int(np.count_nonzero(leaf_mask))
+    yellow_area = int(np.count_nonzero(yellow_mask))
     green_area = int(np.count_nonzero(green_mask))
 
     if leaf_area == 0:
