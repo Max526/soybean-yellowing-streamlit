@@ -73,8 +73,14 @@ def inject_css() -> None:
     st.markdown(
         """
         <style>
-        .main-title { font-size: 2.2rem; font-weight: 800; margin-bottom: 0.2rem; }
-        .sub-title { color: #64748b; font-size: 1.05rem; margin-bottom: 1.2rem; }
+        .hero { border: 1px solid #dbeafe; border-radius: 26px; padding: 28px 30px; margin-bottom: 20px; background: linear-gradient(135deg, #ecfdf5 0%, #eff6ff 55%, #fff7ed 100%); box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08); }
+        .main-title { font-size: 2.35rem; font-weight: 900; margin-bottom: 0.35rem; color: #0f172a; }
+        .sub-title { color: #475569; font-size: 1.08rem; margin-bottom: 1.2rem; line-height: 1.7; }
+        .badge-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+        .badge { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #bbf7d0; background: rgba(240, 253, 244, 0.85); color: #166534; border-radius: 999px; padding: 7px 12px; font-size: 0.9rem; font-weight: 700; }
+        .feature-card { border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px; height: 100%; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); }
+        .feature-title { font-weight: 850; color: #0f172a; font-size: 1.02rem; margin-bottom: 6px; }
+        .feature-text { color: #64748b; font-size: 0.92rem; line-height: 1.55; }
         .metric-card { border: 1px solid #e2e8f0; border-radius: 18px; padding: 18px 20px; background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); }
         .metric-label { color: #64748b; font-size: 0.92rem; margin-bottom: 4px; }
         .metric-value { color: #0f172a; font-size: 1.7rem; font-weight: 800; }
@@ -85,6 +91,11 @@ def inject_css() -> None:
         .severe { background: #fef2f2; color: #991b1b; }
         .small-note { color: #64748b; font-size: 0.9rem; }
         .warn-note { color: #92400e; background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 10px 12px; }
+        .pipeline { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+        .pipe-step { border: 1px solid #dbeafe; border-radius: 16px; padding: 14px 12px; background: #eff6ff; text-align: center; color: #1e3a8a; font-weight: 750; font-size: 0.92rem; }
+        .interpretation { border-left: 5px solid #22c55e; background: #f0fdf4; border-radius: 14px; padding: 14px 16px; color: #14532d; line-height: 1.65; margin: 12px 0; }
+        .limit-box { border: 1px solid #fed7aa; background: #fff7ed; color: #9a3412; border-radius: 16px; padding: 15px 16px; line-height: 1.65; }
+        @media (max-width: 900px) { .pipeline { grid-template-columns: 1fr; } .main-title { font-size: 1.75rem; } }
         </style>
         """,
         unsafe_allow_html=True,
@@ -375,11 +386,45 @@ def dataframe_to_csv_bytes(df: pd.DataFrame) -> bytes:
 
 
 def render_header() -> None:
-    st.markdown(f'<div class="main-title">🌱 {APP_TITLE}</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="sub-title">面向農業研究、教學展示與田間初步篩檢的黃化程度量化工具</div>',
+        f'''
+        <div class="hero">
+            <div class="main-title">🌱 {APP_TITLE}</div>
+            <div class="sub-title">以 YOLO11 葉片偵測結合 HSV 色彩空間分析，將大豆葉片影像轉換為可解釋的黃化比例、分級結果與 CSV 數據，適合農業研究、教學展示與田間初步篩檢。</div>
+            <div class="badge-row"><span class="badge">YOLO11n 偵測</span><span class="badge">HSV 黃化量化</span><span class="badge">批次 CSV 匯出</span><span class="badge">HPC 訓練成果</span></div>
+        </div>
+        ''',
         unsafe_allow_html=True,
     )
+
+
+def render_platform_overview() -> None:
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown('<div class="feature-card"><div class="feature-title">① 自動找出葉片</div><div class="feature-text">使用 YOLO 模型定位葉片區域，降低背景對黃化比例估算的干擾。</div></div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown('<div class="feature-card"><div class="feature-title">② 量化黃化程度</div><div class="feature-text">於 HSV 色彩空間計算黃色、綠色與黃綠比，輸出可比較的數值指標。</div></div>', unsafe_allow_html=True)
+    with c3:
+        st.markdown('<div class="feature-card"><div class="feature-title">③ 產生研究資料</div><div class="feature-text">支援單張與批次分析，可下載 CSV，方便放入報告與後續統計。</div></div>', unsafe_allow_html=True)
+
+
+def render_model_summary() -> None:
+    st.markdown('### 模型與訓練成果')
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        render_metric('模型', 'YOLO11n')
+    with c2:
+        render_metric('mAP50', '0.995')
+    with c3:
+        render_metric('mAP50-95', '0.980')
+    with c4:
+        render_metric('HPC 訓練', '50 epochs')
+    st.caption('以上為 w3_formal_baseline_hpc baseline 訓練結果；本平台以此作為葉片偵測與黃化量化展示基礎。')
+
+
+def render_pipeline() -> None:
+    st.markdown('### 分析流程')
+    st.markdown('''<div class="pipeline"><div class="pipe-step">上傳圖片</div><div class="pipe-step">YOLO 偵測</div><div class="pipe-step">葉片 ROI</div><div class="pipe-step">HSV 分析</div><div class="pipe-step">分級與匯出</div></div>''', unsafe_allow_html=True)
 
 
 def render_metric(label: str, value: str) -> None:
@@ -471,6 +516,16 @@ def render_single_image_result(uploaded_file: Any, model: Any | None, config: Ru
         unsafe_allow_html=True,
     )
 
+    st.markdown(
+        f'''
+        <div class="interpretation">
+            本張影像平均黃化比例為 <b>{avg_yellow:.1f}%</b>，平均綠色比例為 <b>{avg_green:.1f}%</b>。
+            系統依黃化比例判定為「<b>{main_diagnosis}</b>」。此結果可作為葉片黃化程度量化參考，後續仍建議搭配田間水分、土壤養分與病蟲害紀錄判讀。
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
+
     if model is None:
         st.markdown(
             '<div class="warn-note">目前未載入 YOLO 權重，因此結果是「整張圖片 HSV 測試分析」，不是正式葉片偵測分析。</div>',
@@ -533,13 +588,22 @@ def render_batch_results(uploaded_files: list[Any], model: Any | None, config: R
     summary["avg_green_ratio"] = summary["avg_green_ratio"].round(2)
     summary["diagnosis"] = summary["avg_yellow_ratio"].apply(lambda x: diagnose(float(x))[0])
 
-    c1, c2, c3 = st.columns(3)
+    diagnosis_counts = summary["diagnosis"].value_counts().to_dict()
+
+    c1, c2, c3, c4 = st.columns(4)
     with c1:
         render_metric("圖片數", str(len(uploaded_files)))
     with c2:
         render_metric("總葉片數", str(len(all_results)))
     with c3:
         render_metric("整體平均黃化", f"{summary['avg_yellow_ratio'].mean():.1f}%")
+    with c4:
+        render_metric("需關注圖片", str(int((summary["avg_yellow_ratio"] >= 25).sum())))
+
+    st.markdown(
+        f'''<div class="interpretation">批次分析共處理 <b>{len(uploaded_files)}</b> 張圖片、<b>{len(all_results)}</b> 個葉片偵測結果；其中中度以上黃化圖片數為 <b>{int((summary['avg_yellow_ratio'] >= 25).sum())}</b> 張。分級分布：{diagnosis_counts}</div>''',
+        unsafe_allow_html=True,
+    )
 
     st.markdown("#### 每張圖片摘要")
     st.dataframe(summary, use_container_width=True)
@@ -556,18 +620,15 @@ def render_batch_results(uploaded_files: list[Any], model: Any | None, config: R
 
 def render_empty_state() -> None:
     st.info("請上傳一張或多張葉片圖片開始分析。")
+    render_model_summary()
+    render_pipeline()
     st.markdown(
         """
-        #### 平台定位
-        本平台是大豆葉片黃化程度量化工具，適合研究、教學與田間初步篩檢。  
-        輸出結果可輔助觀察黃化程度，但實際病因仍需搭配田間紀錄與專業判斷。
-
-        #### 平台流程
-        1. 使用 YOLO 找出葉片位置  
-        2. 對葉片區域做必要的白平衡 / 亮度前處理  
-        3. 在 HSV 色彩空間計算黃色比例、綠色比例與黃綠比  
-        4. 依黃化比例輸出健康、輕度、中度或嚴重黃化分級  
-        5. 匯出 CSV，方便後續統計或放進研究報告
+        ### 拍攝建議
+        - 盡量讓葉片清楚、不要嚴重模糊。
+        - 避免強烈反光、過暗陰影或背景顏色太接近葉片。
+        - 單片葉片照片可勾選「只分析最大葉片」；多片葉片照片則建議取消勾選。
+        - 系統輸出的是黃化程度量化，不直接判定病因。
         """
     )
 
@@ -575,6 +636,7 @@ def render_empty_state() -> None:
 def main() -> None:
     inject_css()
     render_header()
+    render_platform_overview()
     config = render_sidebar()
     model = load_yolo_model(config.weight_path)
 
@@ -595,7 +657,7 @@ def main() -> None:
 
     st.markdown("---")
     st.markdown(
-        '<div class="small-note">提醒：本系統提供黃化比例量化與影像輔助判斷，不等同完整病害診斷；實際田間判斷仍建議搭配水分、土壤、病蟲害與生育期資料。</div>',
+        '<div class="limit-box"><b>研究限制與適用範圍：</b>本系統提供黃化比例量化與影像輔助判斷，不等同完整病害診斷；實際田間判斷仍建議搭配水分、土壤、病蟲害、生育期與環境資料。若照片過暗、過曝、葉片被遮蔽或背景干擾嚴重，黃化比例可能產生偏差。</div>',
         unsafe_allow_html=True,
     )
 
