@@ -1,20 +1,23 @@
+# -*- coding: utf-8 -*-
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-APP_TITLE = "大豆葉片黃化程度分析平台"
-DEFAULT_WEIGHT_PATH = "weights/best.pt"
+APP_TITLE = "大豆葉片黃化程度分析平台｜春秋季正式版"
+DEFAULT_WEIGHT_PATH = "weights/best_spring_autumn.pt"
 SUPPORTED_IMAGE_TYPES = ["jpg", "jpeg", "png", "bmp"]
 MAX_IMAGE_SIDE = 1920
 
 MODEL_INFO = {
-    "model": "YOLO11s Detect",
-    "training_platform": "NCHC nano4",
-    "dataset_size": "250 images",
-    "precision": "0.845",
-    "recall": "0.960",
-    "map50": "0.954",
-    "map50_95": "0.574",
+    "model": "YOLO11n Detect（春秋季正式版）",
+    "training_platform": "NCHC nano4 / H200 GPU",
+    "dataset_size": "557 images（春季 307 + 秋季 250）",
+    "split": "train 445 / val 55 / test 57",
+    "precision": "0.999",
+    "recall": "1.000",
+    "map50": "0.995",
+    "map50_95": "0.967",
+    "weights": "weights/best_spring_autumn.pt",
 }
 
 
